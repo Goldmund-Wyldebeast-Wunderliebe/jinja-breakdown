@@ -19,16 +19,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import random
-import os
-
-import jinja2
 import breakdown
 from breakdown.settings import STATIC_URL
+import jinja2
+import markupsafe
+import os
+import random
+
 
 __all__ = ['image', 'greeking']
 
-Markup = jinja2._markupsafe.Markup
+Markup = markupsafe.Markup
 min_func = min
 max_func = max
 env = jinja2.Environment()
