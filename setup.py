@@ -31,7 +31,10 @@ setup(
         "Framework :: Django",
         "Topic :: Text Processing :: Markup :: HTML",
     ],
-    install_requires=["jinja2>=2.6", "CleverCSS"],
+    install_requires=["jinja2>=2.6", "clevercss", "six"],
+    dependency_links=[
+        'https://github.com/clevercss/clevercss/archive/master.zip#egg=clevercss'
+    ],
     # Program data
     scripts=["scripts/breakdown"],
     packages=["breakdown"],
