@@ -198,11 +198,10 @@ def build_context(template_path):
         - context/base.json
         - context for template
     """
-    return dict(
-        BASE_CONTEXT.items()
-        + load_context(base_context_path).items()
-        + load_context(get_context_path(template_path)).items()
-    )
+    res = list(BASE_CONTEXT.items())
+    res.extend(list(load_context(base_context_path).items()))
+    res.extend(list(load_context(get_context_path(template_path)).items()))
+    return dict(res)
 
 
 def load_context(path):
