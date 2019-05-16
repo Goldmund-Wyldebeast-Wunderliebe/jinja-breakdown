@@ -3,36 +3,37 @@
 from setuptools import setup
 import breakdown
 
-version = '.'.join(map(str, breakdown.VERSION))
+version = ".".join(map(str, breakdown.VERSION))
 
 try:
-    longdesc = open('README.rst').read()
+    longdesc = open("README.rst").read()
 except Exception:
-    longdesc = ('Breakdown is a lightweight python webserver that parses ' 
-                'jinja2 templates. It\'s intended to be used by designers '
-                'in rapid prototyping.')
+    longdesc = (
+        "Breakdown is a lightweight python webserver that parses "
+        "jinja2 templates. It's intended to be used by designers "
+        "in rapid prototyping."
+    )
 
 setup(
     # Metadata
-    name='breakdown',
+    name="breakdown",
     version=version,
-    description='Lightweight jinja2 template prototyping server',
+    description="Lightweight jinja2 template prototyping server",
     long_description=longdesc,
-    author='Concentric Sky',
-    author_email='code@concentricsky.com',
+    author="Concentric Sky",
+    author_email="code@concentricsky.com",
     classifiers=[
-        'Environment :: Console',
-        'Operating System :: MacOS :: MacOS X',
-        'Operating System :: Microsoft :: Windows',
-        'Operating System :: POSIX :: Linux',
-        'Programming Language :: Python',
-        'Framework :: Django',
-        'Topic :: Text Processing :: Markup :: HTML'
+        "Environment :: Console",
+        "Operating System :: MacOS :: MacOS X",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: POSIX :: Linux",
+        "Programming Language :: Python",
+        "Framework :: Django",
+        "Topic :: Text Processing :: Markup :: HTML",
     ],
-    install_requires=['jinja2>=2.6', 'CleverCSS'],
-
+    install_requires=["jinja2>=2.6", "CleverCSS"],
     # Program data
-    scripts=['scripts/breakdown'],
-    packages=['breakdown'],
-    package_data={'breakdown': ['img/*', 'templates/*']},
+    scripts=["scripts/breakdown"],
+    packages=["breakdown"],
+    package_data={"breakdown": ["img/*", "templates/*"]},
 )

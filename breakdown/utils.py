@@ -5,10 +5,10 @@ import errno
 def mkdirp(path):
     try:
         os.makedirs(path)
-    except OSError, e:
+    except OSError as e:
         if e.errno == errno.EEXIST:
             pass
-        else: 
+        else:
             raise
 
 
