@@ -25,16 +25,14 @@ import sys
 import shutil
 import optparse
 import jinja2
-import httplib
+import six.moves.http_client as httplib
+from six.moves import BaseHTTPServer
+from six import python_2_unicode_compatible
 import mimetypes
-import string
-import random
 import socket
-import BaseHTTPServer
 import tempfile
 import clevercss
 import json
-import functools
 
 import breakdown
 from breakdown.utils import mkdirp, force_padding
@@ -57,31 +55,31 @@ class BreakdownHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def ok_header(self):
         """ Send a success HTML header and set contenttype """
         self.send_response(httplib.OK)
-        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
 
     def not_found(self):
         """ Standard 404 response """
-        self.send_error(httplib.NOT_FOUND, 'Document not found: %s' % self.path)
+        self.send_error(httplib.NOT_FOUND, "Document not found: %s" % self.path)
         return False
 
     def display_error(self, error):
         """ Render a jinja2 template error """
         self.ok_header()
-        template = breakdown_env.get_template('error.html')
-        context = {'error': error}
+        template = breakdown_env.get_template("error.html")
+        context = {"error": error}
         data = template.render(context)
-        self.wfile.write(data.encode('utf-8'))
+        self.wfile.write(data.encode("utf-8"))
 
     def serve_static(self, path):
         """ Return data from path based on its guessed MIME Type """
         try:
             # Attempt to open path
-            file = open(get_static(path), 'rb')
+            file = open(get_static(path), "rb")
 
             # Send a successful header with guessed mimetype
             self.send_response(httplib.OK)
-            self.send_header('Content-Type', mimetypes.guess_type(path)[0])
+            self.send_header("Content-Type", mimetypes.guess_type(path)[0])
             self.end_headers()
 
             # Write data
@@ -90,7 +88,7 @@ class BreakdownHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         except IOError:
             return self.not_found()
-    
+
     def serve_template(self, path):
         """ Render a template file using jinja2 """
         try:
@@ -103,23 +101,23 @@ class BreakdownHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             # Render the template with jinja2 and write to stream
             data = template.render(ctx)
             self.ok_header()
-            self.wfile.write(data.encode('utf-8'))
+            self.wfile.write(data.encode("utf-8"))
             return
 
         except (jinja2.TemplateNotFound, IOError):
             return self.not_found()
 
-        except jinja2.TemplateSyntaxError, e:
+        except jinja2.TemplateSyntaxError as e:
             self.display_error(e)
 
-    
     def serve_list(self, path):
         """ Display a simple list of templates beginning with `path` """
-        templates = filter(lambda template_path: template_path.startswith(path), self.template_list)
+        templates = filter(
+            lambda template_path: template_path.startswith(path), self.template_list
+        )
         data = render_listing(templates)
         self.ok_header()
-        self.wfile.write(data.encode('utf-8'))
-
+        self.wfile.write(data.encode("utf-8"))
 
     def do_GET(self):
         """ Handle a GET request """
@@ -128,22 +126,22 @@ class BreakdownHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             return self.serve_static(os.path.relpath(self.path, STATIC_URL))
 
         # Update template list
-        self.template_list = map(lambda path: '/%s' % path, env.list_templates())
+        self.template_list = map(lambda path: "/%s" % path, env.list_templates())
 
         # Strip slash
-        path = self.path.endswith('/') and self.path[:-1] or self.path
+        path = self.path.endswith("/") and self.path[:-1] or self.path
 
         # Try various path resolutions
-        for res in (
-            path,
-            path + '.html',
-            path + '/index.html',
-        ):
+        for res in (path, path + ".html", path + "/index.html"):
             if res in self.template_list:
                 return self.serve_template(res)
-        
+
         # Display a list view if any templates begin with path
-        if any(map(lambda template_path: template_path.startswith(path), self.template_list)):
+        if any(
+            map(
+                lambda template_path: template_path.startswith(path), self.template_list
+            )
+        ):
             return self.serve_list(path)
 
         # Finally 404
@@ -154,40 +152,44 @@ def render_listing(templates):
     """
     Render a list view page given a set of templates
     """
-    list_template = breakdown_env.get_template('list.html')
-    return list_template.render({
-        'templates': templates,
-    })
+    list_template = breakdown_env.get_template("list.html")
+    return list_template.render({"templates": templates})
 
 
 def _gen_lambda(x):
     return lambda *args, **kwargs: x
-    
+
+
 def json_obj_hook(o):
     # First, if a __unicode__ attribute was set on the context object, create
     # an appropriate class on the fly since we can't set dict.__unicode__ directly
-    u = o.get('__unicode__') or o.get('__unicode__()')
+    u = o.get("__unicode__") or o.get("__unicode__()")
     if u is not None:
+
+        @python_2_unicode_compatible
         class O(dict):
-            def __unicode__(self):
+            def __str__(self):
                 return u
+
         result = O()
     else:
         result = o
 
-    # Then, attach remaining attributes 
-    for key,val in o.items():
-        if key[-2:] == '()':
+    # Then, attach remaining attributes
+    for key, val in o.items():
+        if key[-2:] == "()":
             result[key[:-2]] = _gen_lambda(val)
         else:
             result[key] = val
     return result
 
+
 def get_context_path(template_path):
-    if template_path.startswith('/'):
+    if template_path.startswith("/"):
         template_path = template_path[1:]
-    result = os.path.join(context_path, template_path.replace('.html', '.json'))
+    result = os.path.join(context_path, template_path.replace(".html", ".json"))
     return result
+
 
 def build_context(template_path):
     """ 
@@ -196,11 +198,11 @@ def build_context(template_path):
         - context/base.json
         - context for template
     """
-    return dict(
-        BASE_CONTEXT.items() +
-        load_context(base_context_path).items() +
-        load_context(get_context_path(template_path)).items()
-    )
+    res = list(BASE_CONTEXT.items())
+    res.extend(list(load_context(base_context_path).items()))
+    res.extend(list(load_context(get_context_path(template_path)).items()))
+    return dict(res)
+
 
 def load_context(path):
     try:
@@ -208,6 +210,7 @@ def load_context(path):
         return result or {}
     except (IOError, ValueError):
         return {}
+
 
 def load_filters(env, path):
     try:
@@ -217,57 +220,62 @@ def load_filters(env, path):
     except IOError:
         return {}
 
+
 def run_server():
     try:
         server = BaseHTTPServer.HTTPServer((ADDR, PORT), BreakdownHandler)
-        print 'Server running at http://127.0.0.1:%s ...' % PORT
-        print 'Press CTRL+C to quit'
+        print("Server running at http://127.0.0.1:%s ..." % PORT)
+        print("Press CTRL+C to quit")
         try:
             server.serve_forever()
         except KeyboardInterrupt:
             sys.exit()
     except socket.error:
-        print 'Unable to bind socket (perhaps another server is running?)'
+        print("Unable to bind socket (perhaps another server is running?)")
 
 
 def get_static(path):
     """ Try to retrieve a static file by looking through static_dirs in order """
     # CSS files
-    if path.endswith('.css'):
+    if path.endswith(".css"):
         # Look for matching clevercss
-        clever_name = path[:path.rfind('.css')] + '.clevercss'
+        clever_name = path[: path.rfind(".css")] + ".clevercss"
         try:
             clever_path = get_static(clever_name)
-            compiled_path = clever_path[:clever_path.rfind('.clevercss')] + '.css'
+            compiled_path = clever_path[: clever_path.rfind(".clevercss")] + ".css"
             # Compile the file if it doesn't exist or the mtime on clevercss is more recent
-            if not os.path.exists(compiled_path) or \
-                   os.stat(clever_path).st_mtime > os.stat(compiled_path).st_mtime:
+            if (
+                not os.path.exists(compiled_path)
+                or os.stat(clever_path).st_mtime > os.stat(compiled_path).st_mtime
+            ):
                 return compile_clever_css(clever_path, compiled_path)
         except IOError:
             # .clevercss match doesn't exist for this file, continue
             pass
-    
+
     # All files
     for dir in static_dirs:
         fullpath = os.path.join(dir, path)
         if os.path.exists(fullpath):
             return fullpath
-    
+
     # Nothing found
     raise IOError
+
 
 def compile_clever_css(src, dst):
     fh = open(src)
     source = fh.read()
     fh.close()
     css = clevercss.convert(source)
-    fh = open(dst, 'w')
+    fh = open(dst, "w")
     fh.write(css)
     fh.close()
     return dst
 
+
 def ver(self, opt, value, parser):
-    print '.'.join(map(str, breakdown.VERSION))
+    print(".".join(map(str, breakdown.VERSION)))
     sys.exit()
 
 
@@ -276,15 +284,17 @@ def export(outroot):
     try:
         mkdirp(outroot)
     except OSError:
-        print "Unable to write to directory '%s'" % outroot
+        print("Unable to write to directory '%s'" % outroot)
         sys.exit(1)
-    
+
     # Render templates
     templates = []
     for dir in template_dirs:
         for root, dirs, files in os.walk(dir):
-            for file in filter(lambda f: f.endswith('.html'), files):
-                relpath = os.path.normpath(os.path.join(os.path.relpath(root, dir), file))
+            for file in filter(lambda f: f.endswith(".html"), files):
+                relpath = os.path.normpath(
+                    os.path.join(os.path.relpath(root, dir), file)
+                )
                 outpath = os.path.join(outroot, relpath)
                 templates.append(relpath)
                 try:
@@ -295,63 +305,92 @@ def export(outroot):
                     t = env.get_template(relpath)
                     ctx = build_context(relpath)
                     data = t.render(ctx)
-                    fh = open(outpath, 'w')
-                    fh.write(data.encode('utf-8'))
+                    fh = open(outpath, "w")
+                    fh.write(data.encode("utf-8"))
                     fh.close()
-                    print 'Rendered template', outpath
+                    print("Rendered template", outpath)
 
                 except jinja2.TemplateNotFound:
-                    print 'Error loading template named', relpath
+                    print("Error loading template named", relpath)
 
     # Collect static
     for dir in static_dirs:
         for root, dirs, files in os.walk(dir):
             for file in files:
                 abspath = os.path.join(root, file)
-                relpath = os.path.normpath(os.path.join(os.path.relpath(root, dir), file))
-                outpath = os.path.join(outroot, 'static', relpath)
+                relpath = os.path.normpath(
+                    os.path.join(os.path.relpath(root, dir), file)
+                )
+                outpath = os.path.join(outroot, "static", relpath)
                 mkdirp(os.path.dirname(outpath))
                 shutil.copyfile(abspath, outpath)
-                print "Created static file", outpath
+                print("Created static file", outpath)
 
     # Write a global template list view if an index.html does not exist
-    index = os.path.join(outroot, 'index.html')
+    index = os.path.join(outroot, "index.html")
     if not os.path.exists(index):
-        fh = open(index, 'w')
+        fh = open(index, "w")
         fh.write(render_listing(templates))
         fh.close()
-        print 'Rendered template', index
+        print("Rendered template", index)
 
 
 def register_template_dir(path):
     template_dirs.append(path)
 
+
 def register_static_dir(path):
     static_dirs.append(path)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
 
     # Populate options
-    op = optparse.OptionParser(usage='%prog (PATH) [OPTIONS]')
-    op.add_option('-p', '--port', dest='port', help='run server on an '
-                  'alternate port (default is 5000)')
-    op.add_option('-m', '--media', action='store_true', dest='media',
-                  help='treat MEDIA_URL as STATIC_URL in templates')
-    op.add_option('-s', '--static-url', dest='static_url',
-                  help='override STATIC_URL (default is %s)' % STATIC_URL)
-    op.add_option('-e', '--export', dest='export',
-                  help='render templates to static html '
-                  'instead of running the server.')
-    op.add_option('-v', '--version', action='callback', callback=ver,
-                  help='display the version number and exit')
-    op.add_option('-c', '--context_dir_name', dest='context_dir_name',
-                  help='set the directory name to be searched for context object files (default is context)')
+    op = optparse.OptionParser(usage="%prog (PATH) [OPTIONS]")
+    op.add_option(
+        "-p",
+        "--port",
+        dest="port",
+        help="run server on an " "alternate port (default is 5000)",
+    )
+    op.add_option(
+        "-m",
+        "--media",
+        action="store_true",
+        dest="media",
+        help="treat MEDIA_URL as STATIC_URL in templates",
+    )
+    op.add_option(
+        "-s",
+        "--static-url",
+        dest="static_url",
+        help="override STATIC_URL (default is %s)" % STATIC_URL,
+    )
+    op.add_option(
+        "-e",
+        "--export",
+        dest="export",
+        help="render templates to static html " "instead of running the server.",
+    )
+    op.add_option(
+        "-v",
+        "--version",
+        action="callback",
+        callback=ver,
+        help="display the version number and exit",
+    )
+    op.add_option(
+        "-c",
+        "--context_dir_name",
+        dest="context_dir_name",
+        help="set the directory name to be searched for context object files (default is context)",
+    )
 
     # Parse arguments
     (options, args) = op.parse_args()
 
     # Optionally override static URL and clean it up
-    STATIC_URL = force_padding(options.static_url or STATIC_URL, '/')
+    STATIC_URL = force_padding(options.static_url or STATIC_URL, "/")
 
     # Setup path globals
     if len(args) > 0:
@@ -361,60 +400,63 @@ if __name__ == '__main__':
     root = os.path.abspath(root)
 
     # Create base context
-    BASE_CONTEXT = {
-        'STATIC_URL': STATIC_URL,
-    }
+    BASE_CONTEXT = {"STATIC_URL": STATIC_URL}
 
     if options.media:
         # Update context
-        BASE_CONTEXT['MEDIA_URL'] = STATIC_URL
-    
+        BASE_CONTEXT["MEDIA_URL"] = STATIC_URL
+
     if options.port:
         try:
             PORT = int(options.port)
             if PORT < 1 or PORT > 0xFFFF:
-                print 'port number out of range'
+                print("port number out of range")
                 sys.exit(2)
         except ValueError:
-            print 'invalid port'
+            print("invalid port")
             sys.exit(2)
 
     # Resolve directory paths by autodetection
 
-    if os.path.exists(os.path.join(root, 'apps')):
+    if os.path.exists(os.path.join(root, "apps")):
         # Try django project structure
-        appspath = os.path.join(root, 'apps')
-        files = [os.path.join(appspath, file) for file in os.listdir(appspath) if not
-                 file.startswith('.')]
+        appspath = os.path.join(root, "apps")
+        files = [
+            os.path.join(appspath, file)
+            for file in os.listdir(appspath)
+            if not file.startswith(".")
+        ]
         app_dirs = filter(os.path.isdir, files)
 
         # Setup template and static dirs
         for dir in app_dirs:
-            t = os.path.join(dir, 'templates')
-            s = os.path.join(dir, 'static')
+            t = os.path.join(dir, "templates")
+            s = os.path.join(dir, "static")
             if os.path.exists(t):
                 register_template_dir(t)
             if os.path.exists(s):
                 register_static_dir(s)
     else:
         # Try simple directory structure--templates and static in toplevel
-        t = os.path.join(root, 'templates')
-        s = os.path.join(root, 'static')
+        t = os.path.join(root, "templates")
+        s = os.path.join(root, "static")
         if os.path.exists(t):
-                register_template_dir(t)
+            register_template_dir(t)
         if os.path.exists(s):
-                register_static_dir(s)
+            register_static_dir(s)
 
-    template_dir_name = 'templates'
-    context_dir_name = options.context_dir_name or 'context'
+    template_dir_name = "templates"
+    context_dir_name = options.context_dir_name or "context"
     context_path = os.path.join(root, context_dir_name)
-    base_context_path = os.path.join(context_path, 'base.json')
-    filters_path = os.path.join(context_path, 'filters.json')
+    base_context_path = os.path.join(context_path, "base.json")
+    filters_path = os.path.join(context_path, "filters.json")
 
     if len(template_dirs) < 1:
-        print('No template directories found.  Make sure to run breakdown from a project '
-              'root, or specify the path to a project root as an argument.  See the README '
-              'for a usage guide.')
+        print(
+            "No template directories found.  Make sure to run breakdown from a project "
+            "root, or specify the path to a project root as an argument.  See the README "
+            "for a usage guide."
+        )
         sys.exit(1)
 
     # Create image cache
@@ -422,13 +464,17 @@ if __name__ == '__main__':
 
     # Setup jinja2 global and register extension functions
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dirs))
-    env.globals['greeking'] = templatetags.greeking
-    env.globals['image'] = lambda width, height: templatetags.image(image_cache, width, height)
-    env.globals['url'] = lambda x, *args, **kwargs: '#'
+    env.globals["greeking"] = templatetags.greeking
+    env.globals["image"] = lambda width, height: templatetags.image(
+        image_cache, width, height
+    )
+    env.globals["url"] = lambda x, *args, **kwargs: "#"
     load_filters(env, filters_path)
 
     # Setup breakdown env for error templates
-    breakdown_env = jinja2.Environment(loader=jinja2.FileSystemLoader(pkg_path('templates')))
+    breakdown_env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(pkg_path("templates"))
+    )
 
     # Run program
     if options.export:
@@ -437,10 +483,10 @@ if __name__ == '__main__':
 
     else:
         # Show directories
-        print 'Serving templates from:\n  ' + '\n  '.join(template_dirs) + '\n'
+        print("Serving templates from:\n  " + "\n  ".join(template_dirs) + "\n")
         if len(static_dirs) > 0:
-            print 'Serving static data from:\n  ' + '\n  '.join(static_dirs) + '\n'
-        
+            print("Serving static data from:\n  " + "\n  ".join(static_dirs) + "\n")
+
         # Inject our custom image directory for static media
         static_dirs.append(image_cache)
 
